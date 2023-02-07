@@ -6,26 +6,20 @@
 // global scope, and execute the script.
 const hre = require("hardhat");
 
-async function main() {
-  const currentTimestampInSeconds = Math.round(Date.now() / 1000);
-  const ONE_YEAR_IN_SECS = 365 * 24 * 60 * 60;
-  const unlockTime = currentTimestampInSeconds + ONE_YEAR_IN_SECS;
+async function main() 
+{
+     const blogItemContract = await hre.ethers.getContractFactory("BlogItem");
 
-  const lockedAmount = hre.ethers.utils.parseEther("1");
+     const blogItem = await blogItemContract.deploy("Blog_Item_8", "BI8", 1);
 
-  const Lock = await hre.ethers.getContractFactory("Lock");
-  const lock = await Lock.deploy(unlockTime, { value: lockedAmount });
+     await blogItem.deployed();
 
-  await lock.deployed();
-
-  console.log(
-    `Lock with 1 ETH and unlock timestamp ${unlockTime} deployed to ${lock.address}`
-  );
+     console.log(`blogItem was deployed to ${blogItem.address}`);
 }
 
 // We recommend this pattern to be able to use async/await everywhere
 // and properly handle errors.
 main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
+     console.error(error);
+     process.exitCode = 1;
 });
