@@ -10,11 +10,14 @@ contract BlogItem is ERC721, ERC721URIStorage, Ownable
 {
      using Counters for Counters.Counter;
      Counters.Counter private _tokenIdCounter;
-    
+     
      uint256 private _fees;
 
-     constructor(string memory name, string memory symbol, uint256 fees) 
-          ERC721(name, symbol)
+     constructor(
+          string memory name,
+          string memory symbol,
+          uint256 fees
+     ) ERC721(name, symbol)
      {
           _fees = fees;
      }
@@ -34,9 +37,16 @@ contract BlogItem is ERC721, ERC721URIStorage, Ownable
      mapping(string => mappingUriData) private uriMapping;
 
      mapping(address => uint256[]) private listTokenIdOf;
+     
+     struct medalStruct
+     {
+          uint256 num;
+          bool isExisted;
+     }
+     
+     mapping(uint256 => medalStruct) private medalMapping;
 
      uint256[] private publisedTokenId;
-     
 
      function getFees() public view returns(uint256)
      {
@@ -83,8 +93,7 @@ contract BlogItem is ERC721, ERC721URIStorage, Ownable
           _setTokenURI(tokenId, uri);
 
           uriMapping[uri] = mappingUriData({tokenId: tokenId, isExisted: true});
-
-          publisedTokenId.push(tokenId);
+          medalMapping[tokenId] = medalStruct({num: 0, isExisted: true}); 
 
           makeNode(tokenId);
 
@@ -92,59 +101,79 @@ contract BlogItem is ERC721, ERC721URIStorage, Ownable
      }
      
 
-     function publicBlog(address user, string memory uri)
+     function publicBlog(string memory uri)
           public
           payable
           returns(uint256)
      {
           require(isUriExisted(uri) == false, "URI is existed!");
-          // require(msg.value >= _fees, "Not enough balance! ");
-          // payable(owner()).transfer(_fees);
+          require(msg.value >= _fees, "Not enough balance! ");
+          payable(owner()).transfer(_fees);
           
           // mint nft
-          uint256 newTokenId = mintToken(user, uri);
-          listTokenIdOf[user].push(newTokenId);
+          uint256 newTokenId = mintToken(msg.sender, uri);
+          listTokenIdOf[msg.sender].push(newTokenId);
+          publisedTokenId.push(newTokenId);
 
-
+          uint256 contractBalance = address(this).balance;
+          if(contractBalance > 0)
+          {
+               payable(msg.sender).transfer(address(this).balance); 
+          }
           return newTokenId;
                
      }
 
-     function editBlog(address user, string memory old_uri, string memory new_uri)
+     function editBlog(string memory old_uri, string memory new_uri)
           public
           payable
           returns(uint256)
      {
           uint256 oldTokenId = getTokenIdOfUri(old_uri);
-          require(ownerOf(oldTokenId) == user, "You are not the owner!");
-          uint256 newTokenId = mintToken(user, new_uri);
+          require(ownerOf(oldTokenId) == msg.sender, "You are not the owner!");
+          require(isUriExisted(new_uri) == false, "URI is existed!");
+          require(msg.value >= _fees, "Not enough balance!");
+          payable(owner()).transfer(_fees);
 
-          unionOldNodeToNewNode(oldTokenId, newTokenId);
+          uint256 newTokenId = mintToken(ownerOf(oldTokenId), new_uri);
 
+          bool union = unionOldNodeToNewNode(oldTokenId, newTokenId);
+          require(union == true, "state is existed");
+          medalMapping[newTokenId].num = medalMapping[oldTokenId].num;
+          
+          uint256 contractBalance = address(this).balance;
+          if(contractBalance > 0)
+          {
+               payable(msg.sender).transfer(address(this).balance); 
+          }
           return newTokenId;
      }
 
-     function giveMedalToABlog(string memory old_uri, string memory new_uri)
+     function giveMedalToABlog(string memory old_uri)
           public
           payable
           returns(uint256)
      {
           uint256 oldTokenId = getTokenIdOfUri(old_uri);
-          address ownerOfUri = ownerOf(oldTokenId);
-          uint256 newTokenId = mintToken(ownerOfUri, new_uri);
+          require(isUriExisted(old_uri) == true, "uri is not existed!");
+          require(medalMapping[oldTokenId].isExisted == true, "medal is not existed");
+          require(ownerOf(oldTokenId) != msg.sender, "You can not give medal to your own medal!");
+          require(msg.value >= _fees, "Not enough balance!");
+          uint256 parentToken = findParent(oldTokenId);
+          require(parentToken == oldTokenId, "The blog was edited!");
+          payable(ownerOf(oldTokenId)).transfer(msg.value);
           
-          unionOldNodeToNewNode(oldTokenId, newTokenId);
+          uint256 medal = ++medalMapping[parentToken].num;
 
-          return newTokenId;
+          return medal;
      }
 
      function getTokenIdOfUri(string memory uri)
           public
-          view
           returns(uint256)
      {
           require(uriMapping[uri].isExisted == true, "Uri is not added!");
-          return uriMapping[uri].tokenId;
+          return findParent(uriMapping[uri].tokenId);
      }
 
      function getListTokenIdOfAddress(address user)
@@ -192,6 +221,15 @@ contract BlogItem is ERC721, ERC721URIStorage, Ownable
           }
 
           return output;
+     }
+
+     function getMedalOfUri(string memory uri)
+          public
+          returns(uint256)
+     {
+          uint256 tokenId = getTokenIdOfUri(uri);
+          require(medalMapping[tokenId].isExisted == true, "medal mapping is not existed!");
+          return medalMapping[tokenId].num;
      }
 
      function isUriExisted(string memory uri)

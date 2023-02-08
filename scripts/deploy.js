@@ -10,11 +10,25 @@ async function main()
 {
      const blogItemContract = await hre.ethers.getContractFactory("BlogItem");
 
-     const blogItem = await blogItemContract.deploy("Blog_Item_8", "BI8", 1);
+     const gasPrice = await blogItemContract.signer.getGasPrice();
+     console.log(`Current gas price: ${gasPrice}`);
+
+     const estimateGas = await blogItemContract.signer.estimateGas();
+     console.log(`Estimated gas: ${estimateGas}`);
+
+     const address = await blogItemContract.signer.getAddress();
+     console.log(`Deployer address: ${address}`);
+
+     const balance= await blogItemContract.signer.getBalance();
+     console.log(`Deployer balance: ${ethers.utils.formatEther(balance)}`);
+
+     
+     const blogItem = await blogItemContract.deploy("Blog_Item_8", "BI8", 10);
 
      await blogItem.deployed();
 
-     console.log(`blogItem was deployed to ${blogItem.address}`);
+     console.log(`Deployed address: ${blogItem.address}`);
+     
 }
 
 // We recommend this pattern to be able to use async/await everywhere
